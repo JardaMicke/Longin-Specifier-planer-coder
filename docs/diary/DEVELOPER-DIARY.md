@@ -92,13 +92,13 @@ Stav: [ ] nezačato / [~] probíhá / [x] hotovo / [!] blokováno
   - Test: lze podle specifikace implementovat bez domýšlení
   - Stav: HOTovo 2026-08-13
 
-- [ ] **S-004** — Specifikace GANGLION: LLM Manager
+- [x] **S-004** — Specifikace GANGLION: LLM Manager
   - Cíl: Specifikovat správu lokálních (LM Studio, Ollama) a cloud modelů
   - Kontext: Plné ovládání výběru a načítání modelů, tokenizéry, cache
   - Závislosti: S-002, S-003
   - DoD: Data model modelů, seznam API (Ollama, LM Studio, OpenAI-compatible), state machine načítání, edge cases
   - Test: AC pro načtení modelu, selhání, přepnutí
-  - Stav: NEZAČATO
+  - Stav: HOTovo 2026-08-13
 
 - [ ] **S-005** — Specifikace GANGLION: State Machine (Stavový automat)
   - Cíl: Specifikovat přechody BRAINSTORMING → PLANNING → VÝVOJ → (DEPLOY)
@@ -312,5 +312,48 @@ Stav: [ ] nezačato / [~] probíhá / [x] hotovo / [!] blokováno
 - [x] Testováno proti reálným datům — soubor existuje, obsahuje 10 sekcí, DoD splněno; konzistence ověřena vůči GLOSSARY (terminologie CORE/Ganglion/Nexus/View) a vůči DL-001..DL-004
 - [x] Jak plánováno — DoD S-003 splněno, stupeň SPECIFIED pro CORE
 - [x] UI má ovládací prvky pro každou funkci — CORE API (REST/WS) poskytuje data pro Dashboard (VIEW-001), LLM Manager (VIEW-005), Diary (VIEW-007); UI kontroly (retry tlačítko při ERROR, phase transition button) specifikovány v API kontraktu a edge cases
+
+---
+
+### 2026-08-13T23:34Z — S-004: Specifikace GANGLION LLM Manager (G-001)
+
+**Akce:**
+- Vytvořen soubor `docs/specification/ganglion-llm-manager.md` (specifikace G-001, stupeň 4 — SPECIFIED)
+- Sekce 1: Účel a rozsah — správa providerů, načítání/přepínání modelů, inference proxy, tokenizér, cache
+- Sekce 2: Responsibility Matrix (CORE vs G-001 vs Nexus vs jiný Ganglion)
+- Sekce 3: Provider kontrakty — Ollama (`/api/tags`, `/api/chat`), LM Studio (OpenAI-compatible `/v1`), OpenAI-compatible (cloud); sjednocený vnitřní interface `LLMProvider`
+- Sekce 4: Data Model — 4 entity (`llm.provider`, `llm.model`, `llm.inference_cache`, `llm.token_estimate`) s atributy, typy, validací, constrainty (partial unique index na is_active)
+- Sekce 5: State Machine SM-LLM-01 (INIT→LOADING→READY/ERROR/NOT_LOADED→UNLOADED), 8 přechodů, atomicita aktivace v transakci
+- Sekce 6: Event Model — 7 eventů (model.load.started, model.ready, model.error, model.unloaded, model.switched, inference.cache_hit, provider.health.changed), konzistentní s CORE event busem (S-003)
+- Sekce 7: API kontrakt — REST (providers, models, load, activate, chat, chat/stream SSE, embed, count-tokens)
+- Sekce 8: Cache strategie (sha256 hash, TTL 7 dnů, LRU eviction při >10000, bypass, invalidace)
+- Sekce 9: Token management (přesný count pro OpenAI/LM Studio, odhad přes tiktoken pro Ollama, context_window check)
+- Sekce 10: Edge Cases EC-LLM-01..EC-LLM-12 (provider down, LM Studio unload, klíč expiroval, timeout, souběžná inference, cache per model, context window, souběžný load, stream přerušen, embedding dimenze, token odhad, delete active)
+- Sekce 11: Acceptance Criteria AC-LLM-01..AC-LLM-14 (objektivně měřitelné)
+- Sekce 12: UI propojení — VIEW-005 Models Dashboard (refresh, load, activate, delete, health) a VIEW-006 Model Detail (load, activate, test inference, token count, cache stats) s ovládacími prvky
+- Sekce 13: Security (API klíče v secret store šifrovaně, has_api_key indikátor, cloud příznak)
+- Sekce 14: Konfigurace (.env proměnné)
+- Sekce 15: Implementation Tasks odkaz (IT-LLM-01..09, detaily v P-003)
+- Sekce 16: DoD splněno
+
+**Zdůvodnění:**
+- DL-003 (Specifikace první) — LLM Manager specifikován před implementací (D-003)
+- DL-001 (Python BE + React FE) — API kontrakt (REST + SSE) pro React frontend, sjednocený provider interface v Pythonu
+- DL-002 (React + Vite) — VIEW-005/VIEW-006 ovládací prvky pro každou funkci (load, activate, delete, test, token count, cache stats)
+- DL-004 (akronym) — konzistentní s GLOSSARY terminologií
+- Zadání „tokenizéry databáze postgres s PG vektor rozšířením ready pro cache" — řešeno v sekcích 4.3 (inference_cache v PostgreSQL), 8 (cache strategie), 4.4 (token_estimate cache)
+- Zadání „plné ovládání výběru a načítání modelů" — řešeno SM-LLM-01 a API load/activate
+- Bod 5 instrukcí — Data Model, State Machine, UI/UX propojení; vše specifikováno
+- Bod 8 instrukcí — Edge cases povinně (12 scénářů)
+- Bod 9 instrukcí — traceability: US-001/US-002 → FR-003 → G-001 → IT-LLM-* → AC-LLM-*
+- Bod 11 instrukcí — Quality Gate: lze implementovat bez domýšlení (konzistentní s DL-001..DL-004, GLOSSARY, S-003 CORE)
+- MVC dodrženo — G-001 = Model/doménová logika, Views (VIEW-005/006) v S-013, Controller v REST API vrstvě
+
+**Stav:** HOTovo
+**Kontrolní seznam:**
+- [x] Logika dokončena — G-001 má data model, state machine, API, events, cache, token management, edge cases, AC
+- [x] Testováno proti reálným datům — soubor existuje, obsahuje 16 sekcí, DoD splněno; konzistence ověřena vůči GLOSSARY (terminologie LLM Manager/Nexus/VIEW-005/006), S-003 CORE (event bus, ganglion lifecycle), FR-003/SM-002/Model entita z páteřní specifikace
+- [x] Jak plánováno — DoD S-004 splněno, stupeň SPECIFIED pro G-001
+- [x] UI má ovládací prvky pro každou funkci — VIEW-005 (refresh, load, activate, delete) a VIEW-006 (load, activate, test inference, token count, cache stats, edit display_name) specifikovány s kontrolními prvky; retry tlačítka v edge cases
 
 ---
