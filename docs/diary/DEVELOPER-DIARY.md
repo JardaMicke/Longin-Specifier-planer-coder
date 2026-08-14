@@ -100,13 +100,13 @@ Stav: [ ] nezačato / [~] probíhá / [x] hotovo / [!] blokováno
   - Test: AC pro načtení modelu, selhání, přepnutí
   - Stav: HOTovo 2026-08-13
 
-- [ ] **S-005** — Specifikace GANGLION: State Machine (Stavový automat)
+- [x] **S-005** — Specifikace GANGLION: State Machine (Stavový automat)
   - Cíl: Specifikovat přechody BRAINSTORMING → PLANNING → VÝVOJ → (DEPLOY)
   - Kontext: Bod 13 instrukcí — state machine s přechody, podmínkami, eventy
   - Závislosti: S-002, S-003
   - DoD: Diagram stavů, přechody, trigger, podmínky, eventy, persistence
   - Test: AC pro každý přechod
-  - Stav: NEZAČATO
+  - Stav: HOTovo 2026-08-13
 
 - [ ] **S-006** — Specifikace GANGLION: Conversation/Chat
   - Cíl: Rozhovor jako prostředek vývoje, zápis do deníku
@@ -355,5 +355,45 @@ Stav: [ ] nezačato / [~] probíhá / [x] hotovo / [!] blokováno
 - [x] Testováno proti reálným datům — soubor existuje, obsahuje 16 sekcí, DoD splněno; konzistence ověřena vůči GLOSSARY (terminologie LLM Manager/Nexus/VIEW-005/006), S-003 CORE (event bus, ganglion lifecycle), FR-003/SM-002/Model entita z páteřní specifikace
 - [x] Jak plánováno — DoD S-004 splněno, stupeň SPECIFIED pro G-001
 - [x] UI má ovládací prvky pro každou funkci — VIEW-005 (refresh, load, activate, delete) a VIEW-006 (load, activate, test inference, token count, cache stats, edit display_name) specifikovány s kontrolními prvky; retry tlačítka v edge cases
+
+---
+
+### 2026-08-13T23:50Z — S-005: Specifikace GANGLION State Machine (G-002)
+
+**Akce:**
+- Vytvořen soubor `docs/specification/ganglion-state-machine.md` (specifikace G-002, stupeň 4 — SPECIFIED)
+- Sekce 1: Účel a rozsah — definice fází, validace přechodů, persistence, event emitování, gate evaluace
+- Sekce 2: Responsibility Matrix — rozdělení s CORE (CORE drží current_phase, G-002 validuje)
+- Sekce 3: Stavy a přechody (SM-G02-01) — 4 fáze, matice povolených přechodů, diagram, 5 gate skupin (B→P, P→V, V→D, P→B rollback, V→P rollback) s 25 konkrétními gate checky
+- Sekce 4: Data Model — 3 entity (`sm.transition_log`, `sm.gate_status`, `sm.phase_config`) s atributy, validací, constrainty, indexy
+- Sekce 5: Event Model — 5 eventů (phase.transition.requested/validated/denied/accepted, gate.evaluated), konzistentní s CORE event busem (S-003) a SM-CORE-02; poznámka: phase.entered emituje CORE
+- Sekce 6: API kontrakt — REST (`/api/sm/transitions`, `/gates/{code}`, `/gates/{code}/evaluate`, `/history`) + in-process Python interface `validate_transition` pro CORE
+- Sekce 7: Gate evaluační logika — izolace (G-002 nečte cizí tabulky kromě core.ganglion_registry/system_health read-only), závislosti
+- Sekce 8: Edge Cases EC-SM-01..EC-SM-12 (souběžné přechody, gate selhání, rollback bez potvrzení, DB výjimka, project closed, retence, …)
+- Sekce 9: Acceptance Criteria AC-SM-01..AC-SM-12 (objektivně měřitelné)
+- Sekce 10: UI propojení — VIEW-002 Brainstorming, VIEW-003 Planning, VIEW-004 Development s ovládacími prvky (phase transition button, rollback, gate panel, re-check, history)
+- Sekce 11: Implementation Tasks odkaz (IT-SM-01..08, detaily v P-004) se závislostmi
+- Sekce 12: DoD splněno
+
+**Zdůvodnění:**
+- DL-003 (Specifikace první) — State Machine specifikována před implementací (D-004)
+- DL-001 (Python BE + React FE) — in-process Python interface pro CORE, REST + WebSocket pro React frontend
+- DL-004 (akronym) — konzistentní s GLOSSARY terminologií (State Machine, CORE, Ganglion)
+- Bod 13 instrukcí — state machine s přechody, podmínkami, eventy, persistence (vše specifikováno)
+- Bod 5 instrukcí — Data Model, State Machine, UI/UX propojení; vše specifikováno
+- Bod 8 instrukcí — Edge cases povinně (12 scénářů)
+- Bod 9 instrukcí — traceability: US-007 → FR-002 → G-002 → IT-SM-* → AC-SM-*
+- Bod 10 instrukcí — Decision Log: rollback vyžaduje Change Impact Analysis (gate G-PB-03, G-VP-03)
+- Bod 11 instrukcí — Quality Gate: lze implementovat bez domýšlení (konzistentní s DL-001..DL-004, GLOSSARY, S-003 CORE SM-CORE-02, S-004 LLM Manager)
+- Konzistence s CORE: SM-CORE-02 deleguje validaci na G-002; G-002 nezapisuje current_phase (zdroj pravdy CORE); eventy phase.transition.* konzistentní
+- Konzistence s S-004: gate G-PV-04 kontroluje LLM model READY přes G-001
+- MVC dodrženo — G-002 = Model (gate logika, přechody), Views (VIEW-002/003/004) v S-013, Controller v REST/in-process API vrstvě
+
+**Stav:** HOTovo
+**Kontrolní seznam:**
+- [x] Logika dokončena — G-002 má stavy, přechody, 25 gate checků, data model, eventy, API, edge cases, AC
+- [x] Testováno proti reálným datům — soubor existuje, obsahuje 12 sekcí, DoD splněno; konzistence ověřena vůči GLOSSARY (terminologie State Machine/CORE/Ganglion), S-003 CORE (SM-CORE-02 delegace, event bus, phase.entered), S-004 LLM Manager (gate G-PV-04 závislost), FR-002/SM-001 z páteřní specifikace
+- [x] Jak plánováno — DoD S-005 splněno, stupeň SPECIFIED pro G-002
+- [x] UI má ovládací prvky pro každou funkci — VIEW-002 (přejít do PLANNING, gate panel, re-check), VIEW-003 (přejít do VÝVOJ, rollback, gate panel, re-check), VIEW-004 (přejít do DEPLOY, rollback, gate panel, re-check); společná historie přechodů; WebSocket notifikace
 
 ---
